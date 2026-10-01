@@ -794,23 +794,41 @@ function pageCheckout(app,id){
   +'</div></div>';
 }
 function verifyPay(id){
-  const p=getProduct(id);if(!p)return;
+  const p=getProduct(id);
+  if(!p){toast('Product not found'); return;}
+  
   openModal('<div style="text-align:center;padding:16px 0"><div style="font-size:42px">⏳</div><h3 style="margin:12px 0 6px">Verifying payment…</h3><p class="meta">Confirming your ₹4 UPI payment<br/>This takes a few seconds</p></div>');
+  
   setTimeout(()=>{
-          db.collection("products").doc(id).update({status:'published', paymentStatus:'success', paymentId: paymentId, updatedAt: Date.now()}).then(()=>{
-        _productsCache = _productsCache.map(x=>x.productId===id?{...x,status:'published',paymentStatus:'success',paymentId,updatedAt:Date.now()}:x);
-        const pays=DB.get('payments',[]);
-        pays.push({paymentId,sellerId:p.sellerId,productId:id,amount:4,currency:'INR',status:'success',gatewayOrderId:'MOCK_'+Date.now(),gatewayPaymentId:'MOCK',createdAt:Date.now()});
-        DB.set('payments',pays);
-        DB.set('lastPay',paymentId);
-        closeModal();
-        loadProducts(); // <-- Yeh line add ki hai, jisse naya product turant load ho jayega
-        go('#/payment-success');
-      }).catch(err => {
-        console.error("Payment Update Error:", err);
-        toast("Payment done, but error updating status.");
-      });
-  },2000);
+    const paymentId='PAY_'+Date.now();
+    
+    // 1. Local Cache mein turant update karo taaki user ko apne dashboard par dikhe
+    _productsCache = _productsCache.map(x=>x.productId===id?{...x,status:'published',paymentStatus:'success',paymentId,updatedAt:Date.now()}:x);
+    
+    const pays=DB.get('payments',[]);
+    pays.push({paymentId,sellerId:p.sellerId,productId:id,amount:4,currency:'INR',status:'success',gatewayOrderId:'MOCK_'+Date.now(),gatewayPaymentId:'MOCK',createdAt:Date.now()});
+    DB.set('payments',pays);
+    DB.set('lastPay',paymentId);
+    
+    // 2. Firebase par update karo (agar fail ho bhi, toh user ko rokna nahi hai)
+    db.collection("products").doc(id).set({
+      ...p, 
+      status:'published', 
+      paymentStatus:'success', 
+      paymentId: paymentId, 
+      updatedAt: Date.now()
+    }).then(()=>{
+      console.log("Firebase updated successfully");
+    }).catch((err) => {
+      console.error("Firebase Update Error (but user proceeds):", err);
+    });
+
+    // 3. Modal band karo aur success page par bhejo, chahe Firebase ho ya na ho
+    closeModal();
+    loadProducts(); 
+    go('#/payment-success');
+    
+  }, 2000); // 2 second ka timer
 }
 function pagePayResult(app,ok){
   app.innerHTML='<div class="wrap"><div class="pay-card">'
