@@ -797,15 +797,19 @@ function verifyPay(id){
   const p=getProduct(id);if(!p)return;
   openModal('<div style="text-align:center;padding:16px 0"><div style="font-size:42px">⏳</div><h3 style="margin:12px 0 6px">Verifying payment…</h3><p class="meta">Confirming your ₹4 UPI payment<br/>This takes a few seconds</p></div>');
   setTimeout(()=>{
-    const paymentId='PAY_'+Date.now();
-    db.collection("products").doc(id).update({status:'published', paymentStatus:'success', paymentId: paymentId, updatedAt: Date.now()}).then(()=>{
-      _productsCache = _productsCache.map(x=>x.productId===id?{...x,status:'published',paymentStatus:'success',paymentId,updatedAt:Date.now()}:x);
-      const pays=DB.get('payments',[]);
-      pays.push({paymentId,sellerId:p.sellerId,productId:id,amount:4,currency:'INR',status:'success',gatewayOrderId:'MOCK_'+Date.now(),gatewayPaymentId:'MOCK',createdAt:Date.now()});
-      DB.set('payments',pays);
-      DB.set('lastPay',paymentId);
-      closeModal();go('#/payment-success');
-    });
+          db.collection("products").doc(id).update({status:'published', paymentStatus:'success', paymentId: paymentId, updatedAt: Date.now()}).then(()=>{
+        _productsCache = _productsCache.map(x=>x.productId===id?{...x,status:'published',paymentStatus:'success',paymentId,updatedAt:Date.now()}:x);
+        const pays=DB.get('payments',[]);
+        pays.push({paymentId,sellerId:p.sellerId,productId:id,amount:4,currency:'INR',status:'success',gatewayOrderId:'MOCK_'+Date.now(),gatewayPaymentId:'MOCK',createdAt:Date.now()});
+        DB.set('payments',pays);
+        DB.set('lastPay',paymentId);
+        closeModal();
+        loadProducts(); // <-- Yeh line add ki hai, jisse naya product turant load ho jayega
+        go('#/payment-success');
+      }).catch(err => {
+        console.error("Payment Update Error:", err);
+        toast("Payment done, but error updating status.");
+      });
   },2000);
 }
 function pagePayResult(app,ok){
