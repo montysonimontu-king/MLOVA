@@ -58,16 +58,15 @@ header{position:sticky;top:0;z-index:40;background:rgba(10,15,30,.92);backdrop-f
 .btn-sm{padding:7px 13px;font-size:12.5px;border-radius:9px}
 .btn-block{width:100%;display:block}
 /* ===== Cards / Grid ===== */
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:18px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;transition:.2s;position:relative}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px} .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;transition:.2s;position:relative}
 .card:hover{transform:translateY(-4px);box-shadow:0 16px 40px rgba(0,0,0,.5);border-color:#33487c}
 .card .ph{aspect-ratio:1;background:var(--bg2);overflow:hidden}
 .card .ph img{width:100%;height:100%;object-fit:cover;transition:.4s}
 .card:hover .ph img{transform:scale(1.06)}
-.card .bd{padding:13px 14px}
-.card h3{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.card .pr{color:var(--blue);font-weight:800;font-size:17px;margin:4px 0}
-.meta{font-size:12px;color:var(--muted)}
+.card .bd{padding:8px 10px}
+.card h3{font-size:13px;-webkit-line-clamp:2;display:-webkit-box;-webkit-box-orient:vertical;white-space:normal;overflow:hidden;line-height:1.3}
+.card .pr{color:var(--blue);font-weight:800;font-size:15px;margin:3px 0}
+.meta{font-size:11px;color:var(--muted)}
 .badge{display:inline-block;font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:20px;letter-spacing:.4px}
 .b-new{background:rgba(46,204,113,.15);color:var(--green)}
 .b-ln{background:rgba(66,135,245,.15);color:var(--blue)}
@@ -172,6 +171,11 @@ td{padding:12px 10px;border-bottom:1px solid var(--line)}
 .bnav{display:flex}
 .hwrap{gap:10px}
 .row2{grid-template-columns:1fr}
+} @media(max-width:600px){
+  .grid{grid-template-columns:repeat(2,1fr)!important;gap:8px}
+  .card .bd{padding:6px 8px}
+  .card h3{font-size:12px}
+  .card .pr{font-size:14px}
 }
 </style>
 </head>
@@ -350,12 +354,14 @@ function render(){
 /* ---------- SHARED COMPONENTS ---------- */
 function cardHTML(p){
   const fav=favs().includes(p.productId);
-  return '<div class="card"><a href="#/p/'+p.productId+'"><div class="ph"><img src="'+p.images[0]+'" loading="lazy" onerror="imgFallback(this)" alt="'+esc(p.title)+'"/></div></a>'
-  +'<div class="bd"><h3>'+esc(p.title)+'</h3><div class="pr">'+fmt(p.price)+' <span class="badge '+COND[p.condition]+'" style="float:right;margin-top:3px">'+esc(p.condition).toUpperCase()+'</span></div>'
-  +'<div class="meta">📍 '+esc(p.locality)+', '+esc(p.city)+' · '+ago(p.createdAt)+'</div>'
-  +'<div class="meta" style="margin-top:4px">👤 '+esc(p.sellerName)+'</div>'
-  +'<div style="display:flex;gap:8px;margin-top:11px"><a class="btn btn-blue btn-sm" style="flex:1" href="#/p/'+p.productId+'">View Product</a>'
-  +'<button class="btn btn-ghost btn-sm" onclick="toggleFav(\''+p.productId+'\')">'+(fav?'❤️':'🤍')+'</button></div></div></div>';
+  return '<div class="card"><a href="#/p/'+p.productId+'" style="display:block">'
+  +'<div class="ph" style="position:relative"><img src="'+p.images[0]+'" loading="lazy" onerror="imgFallback(this)" alt="'+esc(p.title)+'"/>'
+  +'<button onclick="event.preventDefault();toggleFav(\''+p.productId+'\')" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,.5);border:none;border-radius:50%;width:28px;height:28px;font-size:14px;cursor:pointer">'+(fav?'❤️':'🤍')+'</button>'
+  +'</div><div class="bd"><h3>'+esc(p.title)+'</h3>'
+  +'<div class="pr">'+fmt(p.price)+'</div>'
+  +'<div class="meta">📍 '+esc(p.locality)+'</div>'
+  +'<span class="badge '+COND[p.condition]+'">'+esc(p.condition).toUpperCase()+'</span>'
+  +'</div></a></div>';
 }
 function sec(title,list,link){return '<div class="sec"><div class="sec-h"><h2>'+title+'</h2>'+(link?'<a href="'+link+'">See all →</a>':'')+'</div><div class="grid">'+list.map(cardHTML).join('')+'</div></div>'}
 function skel(n){let s='';for(let i=0;i<n;i++)s+='<div class="sk"><div class="a"></div><div class="b"></div><div class="b" style="width:60%"></div></div>';return s}
