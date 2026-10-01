@@ -298,14 +298,14 @@ function logout(){ firebase.auth().signOut(); location.hash='#/'; }
 let _productsCache = [];
 const allProducts=()=>_productsCache;
 
-async function loadProducts() {
-  try {
-    const snapshot = await db.collection("products").get();
+function loadProducts() {
+  // Ye line Firebase se real-time data laata hai. Jaise hi koi naya product add hoga, dusre phone par turant dikhega.
+  db.collection("products").onSnapshot((snapshot) => {
     _productsCache = snapshot.docs.map(doc => doc.data());
-    render();
-  } catch(e) {
-    console.error("Error loading products: ", e);
-  }
+    render(); // Data aate hi page refresh karo
+  }, (error) => {
+    console.error("Error loading products: ", error);
+  });
 }
 
 const myProducts=()=>{const u=me();return u?allProducts().filter(p=>p.sellerId===u.uid):[]};
