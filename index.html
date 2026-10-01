@@ -179,7 +179,27 @@ td{padding:12px 10px;border-bottom:1px solid var(--line)}
 }
 </style>
 </head>
-<body>
+<body> <!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore-compat.js"></script>
+
+<script>
+const firebaseConfig = {
+    apiKey: "AIzaSyBcg2DN5PkUG2gKTrU73hwRoTRHlgqNxrw",
+    authDomain: "mlova-6d322.firebaseapp.com",
+    projectId: "mlova-6d322",
+    storageBucket: "mlova-6d322.firebasestorage.app",
+    messagingSenderId: "1088411628785",
+    appId: "1:1088411628785:web:24b4f1deca5a811305e550",
+    measurementId: "G-K1WGWH6S3K"
+  };
+
+  // Firebase Initialize karna
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+</script>
 <header><div class="hwrap">
   <a href="#/" class="logo">ML<span>O</span>VA<small>BUY · SELL · CONNECT</small></a>
   <div class="hsearch">
@@ -276,17 +296,53 @@ function seed(){
   DB.set('payments',products.map(p=>({paymentId:'PAY_SEED'+p.productId.slice(1),sellerId:p.sellerId,productId:p.productId,amount:4,currency:'INR',status:'success',gatewayOrderId:'MOCK_SEED',gatewayPaymentId:'',createdAt:p.createdAt})));
   DB.set('reports',[]);DB.set('favs',{});DB.set('seeded',1);
 }
-seed();
+// seed();
 
 /* ---------- AUTH (mock — replace with Firebase Auth) ---------- */
 const me=()=>{const id=DB.get('session',null);return DB.get('users',[]).find(u=>u.uid===id)||null};
 const isAdmin=()=>{const u=me();return u&&u.role==='admin'};
-function login(email,pass){const u=DB.get('users',[]).find(x=>x.email===email&&x.pass===pass);if(!u)return'Invalid email or password';if(u.suspended)return'This account is suspended. Contact support.';DB.set('session',u.uid);return null}
-function signup(d){const users=DB.get('users',[]);if(users.some(u=>u.email===d.email))return'Email already registered';const u={uid:'u'+Date.now(),name:d.name,email:d.email,pass:d.pass,phone:d.phone||'',profilePhoto:'',city:d.city,locality:d.locality||'',role:'user',createdAt:Date.now()};users.push(u);DB.set('users',users);DB.set('session',u.uid);return null}
-function logout(){DB.set('session',null);location.hash='#/'}
+function login(email,pass){
+  firebase.auth().signInWithEmailAndPassword(email, pass)
+    .then(() => { toast('Welcome back!'); go('#/dashboard'); })
+    .catch((error) => {
+      const e=$('#lerr'); if(e){e.style.display='block'; e.textContent=error.message;}
+    });
+}
+
+function signup(d){
+  firebase.auth().createUserWithEmailAndPassword(d.email, d.pass)
+    .then((userCredential) => {
+      const user = userCredential.user;
+      db.collection("users").doc(user.uid).set({
+        uid: user.uid,
+        name: d.name,
+        email: d.email.toLowerCase(),
+        phone: d.phone || '',
+        city: d.city,
+        locality: d.locality || '',
+        role: 'user',
+        createdAt: Date.now()
+      }).then(() => {
+        toast('Account created 🎉'); go('#/dashboard');
+      });
+    })
+    .catch((error) => {
+      const e=$('#serr'); if(e){e.style.display='block'; e.textContent=error.message;}
+    });
+}
+
+function logout(){ firebase.auth().signOut(); location.hash='#/'; }
 
 /* ---------- DATA HELPERS ---------- */
-const allProducts=()=>DB.get('products',[]);
+let _productsCache = [];
+const allProducts=()=>_productsCache;
+
+// Firebase se products load karne ka function
+async function loadProducts() {
+  const snapshot = await db.collection("products").where("status","==","published").get();
+  _productsCache = snapshot.docs.map(doc => doc.data());
+  render(); // Data aane par page refresh karo
+}
 const saveProducts=p=>DB.set('products',p);
 const myProducts=()=>{const u=me();return u?allProducts().filter(p=>p.sellerId===u.uid):[]};
 const getProduct=id=>allProducts().find(p=>p.productId===id);
@@ -302,7 +358,24 @@ function userChip(){const u=me();$('#hauth').innerHTML=u
   :'<a href="#/login">Login</a>'}
 
 /* ---------- ROUTER ---------- */
-function nav(){const r=(location.hash.replace('#','')||'/').split('?')[0];$$('.bnav a').forEach(a=>a.classList.toggle('on',a.dataset.r===r||(a.dataset.r==='/'&&r==='/')))}
+function nav(){const r=(location.hash.replace('#','')||'/').split('?')[0];$$('.bnav a').forEach(a=>a.classList.toggle('on',a.dataset.r===r||(a.dataset.r==='/'&&r==='/')))} firebase.auth().onAuthStateChanged((user) => {
+  if (user) {
+    const currentPath = location.hash.replace('#','') || '/';
+    if (currentPath === '/login' || currentPath === '/signup') {
+      go('#/dashboard');
+    }
+    userChip();
+    render();
+  } else {
+    userChip();
+    render();
+  }
+}); window.addEventListener('load',()=>{
+  $('#hc').innerHTML=CITIES.map(c=>'<option '+(c===myCity()?'selected':'')+'>'+c+'</option>').join('');
+  loadProducts(); // Yeh line add karein
+  render()
+});
+});
 window.addEventListener('hashchange',render);
 window.addEventListener('load',()=>{$('#hc').innerHTML=CITIES.map(c=>'<option '+(c===myCity()?'selected':'')+'>'+c+'</option>').join('');render()});
 
@@ -348,9 +421,40 @@ function render(){
   else if(path==='/favorites')pageFavs(app);
   else if(path==='/admin'){if(requireAdmin())pageAdmin(app,q)}
   else{app.innerHTML='<div class="empty"><div class="ic">🧭</div><h2>Page not found</h2><p style="margin:8px 0 18px">The page you are looking for does not exist.</p><a class="btn btn-blue" href="#/">Go Home</a></div>'}
+} function loginWithGoogle(){
+  const provider = new firebase.auth.GoogleAuthProvider();
+  firebase.auth().signInWithPopup(provider)
+    .then((result) => {
+      const user = result.user;
+      db.collection("users").doc(user.uid).get().then((doc) => {
+        if (!doc.exists) {
+          db.collection("users").doc(user.uid).set({
+            uid: user.uid,
+            name: user.displayName,
+            email: user.email,
+            phone: user.phoneNumber || '',
+            profilePhoto: user.photoURL || '',
+            city: 'Jaipur', 
+            locality: '',
+            role: 'user',
+            createdAt: Date.now()
+          }).then(() => {
+            toast('Google Login Successful! 🎉');
+            go('#/dashboard');
+          });
+        } else {
+          toast('Welcome back! 👋');
+          go('#/dashboard');
+        }
+      });
+    })
+    .catch((error) => {
+      console.error(error);
+      toast(error.message);
+    });
 }
 </script>
-<script>
+<script> 
 /* ---------- SHARED COMPONENTS ---------- */
 function cardHTML(p){
   const fav=favs().includes(p.productId);
@@ -547,7 +651,10 @@ function submitSell(){
   e.style.display='none';
   const u=me();
   const p={productId:'p'+Date.now(),sellerId:u.uid,sellerName:u.name,...d,createdAt:Date.now(),updatedAt:Date.now(),status:'draft',paymentStatus:'unpaid',paymentId:'',views:0,favoritesCount:0,flagged:false};
-  const all=allProducts();all.unshift(p);saveProducts(all);
+db.collection("products").doc(p.productId).set(p).then(()=>{
+  toast('Draft saved — complete payment to publish');
+  go('#/checkout/'+p.productId);
+});
   toast('Draft saved — complete payment to publish');go('#/checkout/'+p.productId);
 }
 function submitEdit(id){
@@ -640,7 +747,7 @@ function pageLogin(app){
   +'<label>Password</label><input id="l_pass" type="password" placeholder="••••••••"/>'
   +'<div class="err" id="lerr"></div>'
   +'<button class="btn btn-blue btn-block" style="margin-top:18px" onclick="doLogin()">Login</button>'
-  +'<button class="btn btn-ghost btn-block" style="margin-top:10px" onclick="toast(\'Connect Firebase to enable Google Sign-In\')">🔵 Continue with Google</button>'
+  +'<button class="btn btn-ghost btn-block" style="margin-top:10px" onclick="loginWithGoogle()">🔵 Continue with Google</button>'
   +'<p class="meta" style="text-align:center;margin-top:16px"><a href="#/forgot" style="color:var(--blue)">Forgot password?</a> · New here? <a href="#/signup" style="color:var(--gold)">Sign up</a></p>'
   +'<div style="background:var(--bg2);border:1px dashed var(--line);border-radius:12px;padding:12px;margin-top:18px;font-size:12px;color:var(--muted);line-height:1.8"><b style="color:var(--text)">Demo accounts</b><br/>Buyer/Seller: rahul@demo.in / demo123<br/>Admin: admin@mlova.in / admin123</div>'
   +'</div></div>';
