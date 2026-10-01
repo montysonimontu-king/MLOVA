@@ -358,31 +358,45 @@ function userChip(){const u=me();$('#hauth').innerHTML=u
   :'<a href="#/login">Login</a>'}
 
 /* ---------- ROUTER ---------- */
-function nav(){const r=(location.hash.replace('#','')||'/').split('?')[0];$$('.bnav a').forEach(a=>a.classList.toggle('on',a.dataset.r===r||(a.dataset.r==='/'&&r==='/')))} firebase.auth().onAuthStateChanged((user) => {
+function nav(){const r=(location.hash.replace('#','')||'/').split('?')[0];$$('.bnav a').forEach(a=>a.classList.toggle('on',a.dataset.r===r||(a.dataset.r==='/'&&r==='/')))} firebase.auth().onAuthStateChanged(async (user) => {
   if (user) {
-    const currentPath = location.hash.replace('#','') || '/';
+    // Firebase se user ki details le rahe hain
+    const doc = await db.collection("users").doc(user.uid).get();
+    if (doc.exists) {
+      const userData = doc.data();
+      // LocalStorage me update kar rahe hain taaki me() function kaam kare
+      let localUsers = DB.get('users', []);
+      const idx = localUsers.findIndex(u => u.uid === user.uid);
+      if (idx >= 0) localUsers[idx] = userData; else localUsers.push(userData);
+      DB.set('users', localUsers);
+      DB.set('session', user.uid);
+    }
+    
+        const currentPath = location.hash.replace('#','') || '/';
     if (currentPath === '/login' || currentPath === '/signup') {
       go('#/dashboard');
     }
     userChip();
     render();
   } else {
+    DB.set('session', null); // Logout hone par clear karo
     userChip();
     render();
   }
-}); window.addEventListener('load',()=>{
-  $('#hc').innerHTML=CITIES.map(c=>'<option '+(c===myCity()?'selected':'')+'>'+c+'</option>').join('');
-  loadProducts(); // Yeh line add karein
-  render()
 });
-});
+
 window.addEventListener('hashchange',render);
-window.addEventListener('load',()=>{$('#hc').innerHTML=CITIES.map(c=>'<option '+(c===myCity()?'selected':'')+'>'+c+'</option>').join('');render()});
+window.addEventListener('load',()=>{
+  $('#hc').innerHTML=CITIES.map(c=>'<option '+(c===myCity()?'selected':'')+'>'+c+'</option>').join('');
+  loadProducts(); 
+  render();
+});
 
 const PROTECTED=['/dashboard','/my-listings','/sell','/profile','/favorites'];
 function go(h){location.hash=h}
 function requireAuth(){if(!me()){toast('Please login to continue');go('#/login');return false}return true}
 function requireAdmin(){if(!isAdmin()){toast('Admin access only');go('#/');return false}return true}
+
 
 function render(){
   userChip();nav();
@@ -655,7 +669,6 @@ db.collection("products").doc(p.productId).set(p).then(()=>{
   toast('Draft saved — complete payment to publish');
   go('#/checkout/'+p.productId);
 });
-  toast('Draft saved — complete payment to publish');go('#/checkout/'+p.productId);
 }
 function submitEdit(id){
   const{errs,d}=readForm();
