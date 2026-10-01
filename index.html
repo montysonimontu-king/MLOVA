@@ -663,12 +663,25 @@ function submitSell(){
   const e=$('#ferr');
   if(errs.length){e.style.display='block';e.innerHTML=errs.join('<br/>');window.scrollTo(0,document.body.scrollHeight);return}
   e.style.display='none';
+  
   const u=me();
-  const p={productId:'p'+Date.now(),sellerId:u.uid,sellerName:u.name,...d,createdAt:Date.now(),updatedAt:Date.now(),status:'draft',paymentStatus:'unpaid',paymentId:'',views:0,favoritesCount:0,flagged:false};   _productsCache.unshift(p); // Product ko local memory me daalo taaki checkout page pe dikh sake
-db.collection("products").doc(p.productId).set(p).then(()=>{
-  toast('Draft saved — complete payment to publish');
-  go('#/checkout/'+p.productId);
-});
+  if(!u || !u.uid){ toast('Please login first'); go('#/login'); return; }
+  
+  const p={productId:'p'+Date.now(),sellerId:u.uid,sellerName:u.name || u.displayName || 'User',...d,createdAt:Date.now(),updatedAt:Date.now(),status:'draft',paymentStatus:'unpaid',paymentId:'',views:0,favoritesCount:0,flagged:false};
+  
+  _productsCache.unshift(p); // Local memory me save kiya
+  
+  db.collection("products").doc(p.productId).set(p)
+    .then(()=>{
+      toast('Draft saved — complete payment to publish');
+      go('#/checkout/'+p.productId);
+    })
+    .catch((err)=>{
+      console.error("Firebase Save Error:", err);
+      toast('Network/Database Error. Check console.');
+      // Agar Firebase me save na ho, phir bhi user ko checkout par bhej do taaki payment le saken
+      go('#/checkout/'+p.productId);
+    });
 }
 function submitEdit(id){
   const{errs,d}=readForm();
