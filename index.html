@@ -329,7 +329,7 @@ function setCity(c){DB.set('city',c);$('#hc').value=c;render()}
 function doSearch(){const q=$('#hq').value.trim();location.hash='#/search?q='+encodeURIComponent(q)}
 
 function userChip(){const u=me();$('#hauth').innerHTML=u
-  ?'<a href="#/dashboard" title="Dashboard">'+(u.profilePhoto?'<img src="'+u.profilePhoto+'" style="width:34px;height:34px;border-radius:50%;object-fit:cover;border:2px solid var(--gold)"/>':'<span class="avatar">'+esc(u.name[0].toUpperCase())+'</span>')+'</a>'
+  ?'<a href="#/profile" title="profile">'+(u.profilePhoto?'<img src="'+u.profilePhoto+'" style="width:34px;height:34px;border-radius:50%;object-fit:cover;border:2px solid var(--gold)"/>':'<span class="avatar">'+esc(u.name[0].toUpperCase())+'</span>')+'</a>'
   :'<a href="#/login">Login</a>'}
 
 firebase.auth().onAuthStateChanged(async (user) => {
