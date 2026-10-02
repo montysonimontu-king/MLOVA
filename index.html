@@ -323,33 +323,36 @@ const myProducts=()=>{const u=me();return u?allProducts().filter(p=>p.sellerId==
 const getProduct=id=>allProducts().find(p=>p.productId===id);
 const published=()=>{const u=me();const bl=u?(DB.get('blocked',{})[u.uid]||[]):[];return allProducts().filter(p=>p.status==='published'&&!bl.includes(p.sellerId))};
 const favs=()=>{const u=me();return u?(DB.get('favs',{})[u.uid]||[]):[]};
-function toggleFav(id){const u=me();if(!u){location.hash='#/login';return}const f=DB.get('favs',{});f[u.uid]=f[u.uid]||[];const i=f[u.uid].indexOf(id);if(i>=0)f[u.uid].splice(i,1);else f[u.uid].push(id);DB.set('favs',f);toast(i>=0?'Removed from favorites':'Saved to favorites ♥');render()}
-const myCity=()=>DB.get('city','Jaipur');
-function setCity(c){DB.set('city',c);$('#hc').value=c;render()}
-function doSearch(){const q=$('#hq').value.trim();location.hash='#/search?q='+encodeURIComponent(q)}
+function toggleFav(id){
+  const u = me();
 
-function userChip(){const u=me();$('#hauth').innerHTML=u
-  ?'<a href="#/profile" title="profile">'+(u.profilePhoto?'<img src="'+u.profilePhoto+'" style="width:34px;height:34px;border-radius:50%;object-fit:cover;border:2px solid var(--gold)"/>':'<span class="avatar">'+esc(u.name[0].toUpperCase())+'</span>')+'</a>'
-  :'<a href="#/login">Login</a>'}
+  if(!u){
+    toast('Please login to save this product');
+    go('#/login');
+    return;
+  }
 
-firebase.auth().onAuthStateChanged(async (user) => {
-  if (user) {
-    const doc = await db.collection("users").doc(user.uid).get();
-    if (doc.exists) {
-      const userData = doc.data();
-      let localUsers = DB.get('users', []);
-      const idx = localUsers.findIndex(u => u.uid === user.uid);
-      if (idx >= 0) localUsers[idx] = userData; else localUsers.push(userData);
-      DB.set('users', localUsers);
-      DB.set('session', user.uid);
-    }
-    
-    const currentPath = location.hash.replace('#','') || '/';
-    if (currentPath === '/login' || currentPath === '/signup') {
-      go('#/dashboard');
-    }
-    userChip();
-    render();
+  const f = DB.get('favs', {});
+  f[u.uid] = f[u.uid] || [];
+
+  const i = f[u.uid].indexOf(id);
+
+  if(i >= 0){
+    f[u.uid].splice(i, 1);
+    toast('Removed from favorites');
+  }else{
+    f[u.uid].push(id);
+    toast('Saved to favorites ♥');
+  }
+
+  DB.set('favs', f);
+
+  // Product page ko dobara render mat karo
+  const btn = document.querySelector('[data-fav-btn="'+id+'"]');
+  if(btn){
+    btn.innerHTML = f[u.uid].includes(id) ? '❤️ Saved' : '🤍 Save';
+  }
+}
   } else {
     DB.set('session', null);
     userChip();
@@ -563,7 +566,7 @@ injectJsonLD(p);
   +'<div class="seller-row"><span class="avatar">'+esc(p.sellerName[0].toUpperCase())+'</span><div style="flex:1"><b style="font-size:14.5px">'+esc(p.sellerName)+'</b><div class="meta">Seller · '+esc(p.city)+'</div></div><a class="btn btn-ghost btn-sm" href="#/seller/'+p.sellerId+'">View Profile</a></div>'
   +'<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px">'
   +(p.status==='sold'?'<button class="btn btn-ghost" disabled>Item Sold</button>':'<button class="btn btn-blue" style="flex:2" onclick="contactSeller(\''+p.productId+'\')">📞 Contact Seller</button>')
-  +'<button class="btn btn-ghost" onclick="toggleFav(\''+p.productId+'\')">'+(fav?'❤️ Saved':'🤍 Save')+'</button>'
+  +'<button class="btn btn-ghost" data-fav-btn="'+p.productId+'" onclick="toggleFav(\''+p.productId+'\')">'+(fav?'❤️ Saved':'🤍 Save')+'</button>'
   +'<a class="btn btn-ghost" href="#/report/'+p.productId+'">🚩 Report</a></div>'
   +'<div style="background:rgba(212,175,55,.08);border:1px solid rgba(212,175,55,.3);border-radius:12px;padding:13px;margin-top:16px;font-size:12.5px;color:var(--muted);line-height:1.7"><b style="color:var(--gold)">🛡️ Safety tips:</b> Meet in a public place · Inspect the item before paying · Never pay in advance · Beware of too-good-to-be-true deals</div>'
   +'</div></div>'
@@ -580,7 +583,7 @@ function contactSeller(pid){
   const u = me();
 
   if(!u){
-    toast('Login to contact the seller');
+    toast('Please login to contact the seller');
     go('#/login');
     return;
   }
@@ -600,17 +603,23 @@ function contactSeller(pid){
   }
 
   openModal(
-    '<h3 style="margin-bottom:6px">Contact Seller</h3>' +
+    '<h3 style="margin-bottom:6px">📞 Contact Seller</h3>' +
     '<p class="meta" style="margin-bottom:14px">'+esc(p.title)+'</p>' +
+
     '<div class="seller-row">' +
       '<span class="avatar">'+esc((s.name || 'U')[0].toUpperCase())+'</span>' +
-      '<div><b>'+esc(s.name || 'Seller')+'</b>' +
-      '<div class="meta">'+esc(p.locality || '')+', '+esc(p.city || '')+'</div></div>' +
+      '<div>' +
+        '<b>'+esc(s.name || 'Seller')+'</b>' +
+        '<div class="meta">'+esc(p.locality || '')+', '+esc(p.city || '')+'</div>' +
+      '</div>' +
     '</div>' +
+
     (s.phone
-      ? '<p style="font-size:14px;margin:12px 0">📞 <b style="color:var(--gold);font-size:17px">'+esc(s.phone)+'</b></p>'
-      : '<p class="meta">Seller prefers in-app chat.</p>') +
-    '<button class="btn btn-blue btn-block" onclick="closeModal()">Done</button>'
+      ? '<p style="font-size:15px;margin:16px 0">📞 <b style="color:var(--gold);font-size:18px">'+esc(s.phone)+'</b></p>' +
+        '<a class="btn btn-blue btn-block" href="tel:'+esc(s.phone)+'">Call Seller</a>'
+      : '<p class="meta">Seller has not added a phone number.</p>') +
+
+    '<button class="btn btn-ghost btn-block" style="margin-top:10px" onclick="closeModal()">Close</button>'
   );
 }
 </script>
@@ -896,12 +905,37 @@ function pageReport(app,id){
   +'<p class="meta" style="margin-top:12px;text-align:center">Our team reviews all reports within 24 hours.</p></div></div>';
 }
 function submitReport(pid){
-  const u=me();
-  const repData = {reportId:'r'+Date.now(),reporterId:u?u.uid:'guest',productId:pid,reason:$('#r_reason').value,details:$('#r_details').value.trim(),status:'open',createdAt:Date.now()};
-  db.collection("reports").doc(repData.reportId).set(repData).then(()=>{
-    if(pid){ db.collection("products").doc(pid).update({flagged:true}); }
-    toast('Report submitted. Thank you for keeping MLOVA safe 🛡️');go('#/browse');
-  });
+  const u = me();
+
+  const reason = $('#r_reason') ? $('#r_reason').value : '';
+  const details = $('#r_details') ? $('#r_details').value.trim() : '';
+
+  const repData = {
+    reportId: 'r' + Date.now(),
+    reporterId: u ? u.uid : 'guest',
+    productId: pid,
+    reason: reason,
+    details: details,
+    status: 'open',
+    createdAt: Date.now()
+  };
+
+  db.collection("reports").doc(repData.reportId).set(repData)
+    .then(() => {
+      if(pid){
+        return db.collection("products").doc(pid)
+          .update({flagged:true})
+          .catch(() => {});
+      }
+    })
+    .then(() => {
+      toast('Report submitted successfully ✓');
+      go('#/browse');
+    })
+    .catch(error => {
+      console.error('Report error:', error);
+      toast('Could not submit report. Please try again.');
+    });
 }
 
 function pageAbout(app){app.innerHTML='<div class="wrap"><div class="panel prose" style="max-width:760px;margin:0 auto"><h1 class="page-title" style="color:var(--text)">About MLOVA</h1>'
