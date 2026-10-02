@@ -538,10 +538,19 @@ function pageProduct(app,id){
   if(p.status==='draft'&&(!me()||me().uid!==p.sellerId)){app.innerHTML='<div class="empty"><div class="ic">🔒</div><h2>Listing not published yet</h2></div>';return}
   const ps=allProducts().filter(x=>x.sellerId===p.sellerId&&x.status==='published'&&x.productId!==p.productId).slice(0,4);
   const fav=favs().includes(p.productId);
-  p.views=(p.views||0)+1; 
-  db.collection("products").doc(p.productId).update({views: p.views});
-  _productsCache = _productsCache.map(x=>x.productId===p.productId?p:x);
-  injectJsonLD(p);
+p.views = (p.views || 0) + 1;
+
+db.collection("products").doc(p.productId).update({
+  views: p.views
+}).catch(err => {
+  console.error("View update failed:", err);
+});
+
+_productsCache = _productsCache.map(x =>
+  x.productId === p.productId ? p : x
+);
+
+injectJsonLD(p);
   app.innerHTML='<div class="wrap"><div class="pd"><div>'
   +'<div class="gal-main"><img id="gmain" src="'+p.images[0]+'" onerror="imgFallback(this)" alt="'+esc(p.title)+'"/></div>'
   +'<div class="gal-th">'+p.images.map((im,i)=>'<img src="'+im+'" onerror="imgFallback(this)" class="'+(i===0?'on':'')+'" onclick="swapImg(this,\''+im+'\')"/>').join('')+'</div></div>'
@@ -568,13 +577,41 @@ function uploadAvatar(inp){const f=inp.files[0];if(!f)return;if(!f.type.startsWi
 function injectJsonLD(p){let t=document.getElementById('jsonld');if(!t){t=document.createElement('script');t.type='application/ld+json';t.id='jsonld';document.head.appendChild(t)}t.textContent=JSON.stringify({'@context':'https://schema.org','@type':'Product',name:p.title,description:p.description,image:p.images,category:p.category,offers:{'@type':'Offer',price:p.price,priceCurrency:'INR',availability:p.status==='sold'?'https://schema.org/SoldOut':'https://schema.org/InStock',areaServed:p.city}})}
 function swapImg(el,src){$('#gmain').src=src;$$('.gal-th img').forEach(i=>i.classList.remove('on'));el.classList.add('on')}
 function contactSeller(pid){
-  const u=me();if(!u){toast('Login to contact the seller');go('#/login');return}
-  const p=getProduct(pid);const s=DB.get('users',[]).find(x=>x.uid===p.sellerId);
-  openModal('<h3 style="margin-bottom:6px">Contact Seller</h3><p class="meta" style="margin-bottom:14px">'+esc(p.title)+'</p>'
-  +'<div class="seller-row"><span class="avatar">'+esc(s.name[0].toUpperCase())+'</span><div><b>'+esc(s.name)+'</b><div class="meta">'+esc(p.locality)+', '+esc(p.city)+'</div></div></div>'
-  +(s.phone?'<p style="font-size:14px;margin:12px 0">📞 <b style="color:var(--gold);font-size:17px;letter-spacing:1px">'+esc(s.phone)+'</b></p>':'<p class="meta">Seller prefers in-app chat (coming soon).</p>')
-  +'<p style="font-size:12px;color:var(--muted);line-height:1.6;margin:10px 0 16px">Contact details are shared in a protected flow and only with logged-in buyers. Mention you found this on MLOVA.</p>'
-  +'<button class="btn btn-blue btn-block" onclick="closeModal()">Done</button>');
+  const u = me();
+
+  if(!u){
+    toast('Login to contact the seller');
+    go('#/login');
+    return;
+  }
+
+  const p = getProduct(pid);
+
+  if(!p){
+    toast('Product not found');
+    return;
+  }
+
+  const s = DB.get('users',[]).find(x => x.uid === p.sellerId);
+
+  if(!s){
+    toast('Seller information not available');
+    return;
+  }
+
+  openModal(
+    '<h3 style="margin-bottom:6px">Contact Seller</h3>' +
+    '<p class="meta" style="margin-bottom:14px">'+esc(p.title)+'</p>' +
+    '<div class="seller-row">' +
+      '<span class="avatar">'+esc((s.name || 'U')[0].toUpperCase())+'</span>' +
+      '<div><b>'+esc(s.name || 'Seller')+'</b>' +
+      '<div class="meta">'+esc(p.locality || '')+', '+esc(p.city || '')+'</div></div>' +
+    '</div>' +
+    (s.phone
+      ? '<p style="font-size:14px;margin:12px 0">📞 <b style="color:var(--gold);font-size:17px">'+esc(s.phone)+'</b></p>'
+      : '<p class="meta">Seller prefers in-app chat.</p>') +
+    '<button class="btn btn-blue btn-block" onclick="closeModal()">Done</button>'
+  );
 }
 </script>
 <script>
