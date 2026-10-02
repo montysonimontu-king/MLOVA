@@ -293,7 +293,18 @@ function signup(d){
     });
 }
 
-function logout(){ firebase.auth().signOut(); location.hash='#/'; }
+function logout(){
+  firebase.auth().signOut()
+    .then(() => {
+      DB.set('session', null);
+      toast('Logged out successfully');
+      location.hash = '#/';
+    })
+    .catch((error) => {
+      console.error('Logout error:', error);
+      toast('Logout failed. Please try again.');
+    });
+}
 
 let _productsCache = [];
 const allProducts=()=>_productsCache;
@@ -710,9 +721,9 @@ function pageProfile(app){
   +'<h2>'+esc(u.name)+'</h2><p class="meta">'+esc(u.email)+(u.phone?' · '+esc(u.phone):'')+'</p>'
   +'<div class="kv" style="justify-content:center;margin-top:8px">📍 <b>'+esc(u.locality||'—')+', '+esc(u.city)+'</b> · Member since '+new Date(u.createdAt).toLocaleDateString('en-IN')+'</div>'
   +'<div style="display:flex;gap:10px;justify-content:center;margin-top:18px;flex-wrap:wrap">'
-  +'<a class="btn btn-blue btn-sm" href="#/my-listings">My Listings</a><a class="btn btn-ghost btn-sm" href="#/favorites">Favorites</a>'
+  +'<a class="btn btn-blue btn-sm" href="#/my-listings">My Listings</a><a class="btn btn-ghost btn-sm" href="#/favorites">Favorites</a>' +'<button class="btn btn-red btn-sm" onclick="logout()">Logout</button>'
   +(isAdmin()?'<a class="btn btn-gold btn-sm" href="#/admin">Admin Panel</a>':'')
-  +'<button class="btn btn-red btn-sm" onclick="logout()">Logout</button></div></div></div>';
+  
 }
 function pageSeller(app,id){
   const s=DB.get('users',[]).find(x=>x.uid===id);
