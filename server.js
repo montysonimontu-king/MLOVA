@@ -28,13 +28,12 @@ const server = http.createServer(async (req, res) => {
   if (url.pathname === '/api/auth/google' && req.method === 'POST') { try { const input = await body(req); if (!process.env.GOOGLE_CLIENT_ID) return json(res,503,{error:'Google Sign-In is not configured yet. Add GOOGLE_CLIENT_ID on the server.'}); if (!input.credential) return json(res,400,{error:'Google credential is missing'}); const g=await googleTokenInfo(input.credential); if(g.aud!==process.env.GOOGLE_CLIENT_ID||(g.iss!=='accounts.google.com'&&g.iss!=='https://accounts.google.com')||g.email_verified!=='true')return json(res,401,{error:'Google account could not be verified'}); const email=String(g.email||'').toLowerCase(); let user=data.users.find(u=>u.googleSub===g.sub||u.email===email); if(user){user={...user,googleSub:g.sub,authProvider:'google',profilePhoto:g.picture||user.profilePhoto||'',name:g.name||user.name};data.users=data.users.map(u=>u.uid===user.uid?user:u)}else{user={uid:'g'+g.sub,googleSub:g.sub,authProvider:'google',name:g.name||email.split('@')[0],email,pass:'',phone:'',profilePhoto:g.picture||'',city:'Jaipur',locality:'',role:'user',createdAt:Date.now()};data.users.push(user)} save(data); return json(res,200,{ok:true,user:{...user,pass:undefined}})}catch(e){return json(res,401,{error:e.message||'Google Sign-In failed'})} }
   if (url.pathname === '/api/auth/forgot' && req.method === 'POST') { try { const input=await body(req), email=String(input.email||'').trim().toLowerCase(); if(!/^\S+@\S+\.\S+$/.test(email)) return json(res,400,{error:'Enter a valid email'}); if(!process.env.RESEND_API_KEY||!process.env.MAIL_FROM||!process.env.PUBLIC_APP_URL) return json(res,503,{error:'Email service is not configured. Add RESEND_API_KEY, MAIL_FROM and PUBLIC_APP_URL.'}); const user=data.users.find(u=>u.email===email); if(user){const token=crypto.randomBytes(32).toString('hex'); data.resetTokens=data.resetTokens||{}; data.resetTokens[hashToken(token)]={uid:user.uid,expiresAt:Date.now()+30*60*1000}; save(data); await sendResetEmail(email,token)} return json(res,200,{ok:true,message:'If an account exists for that email, a reset link has been sent.'})}catch(e){return json(res,502,{error:'Could not send the reset email. Please try again.'})} }
   if (url.pathname === '/api/auth/reset' && req.method === 'POST') { try { const input=await body(req), token=String(input.token||''), password=String(input.password||''); if(token.length<20||password.length<6)return json(res,400,{error:'Invalid reset request'}); const key=hashToken(token), entry=(data.resetTokens||{})[key]; if(!entry||entry.expiresAt<Date.now())return json(res,400,{error:'This reset link is invalid or expired'}); data.users=data.users.map(u=>u.uid===entry.uid?{...u,pass:password}:u); delete data.resetTokens[key]; save(data); return json(res,200,{ok:true})}catch(e){return json(res,400,{error:'Could not reset password'})} }
-  if (url.pathname === '/api/payments/claim' && req.method === 'POST') {
+ if (url.pathname === '/api/payments/claim' && req.method === 'POST') {
   try {
     const input = await body(req);
 
     const utr = String(input.utr || '').trim();
     const productId = String(input.productId || '').trim();
-    const sellerId = String(input.sellerId || '').trim();
 
     // 1. UTR must be exactly 12 digits
     if (!/^\d{12}$/.test(utr)) {
@@ -43,7 +42,7 @@ const server = http.createServer(async (req, res) => {
       });
     }
 
-    // 2. Same UTR can NEVER be used again
+    // 2. Same UTR cannot be used again
     const alreadyUsed = data.payments.some(
       p => String(p.utr || '').trim() === utr
     );
@@ -54,11 +53,9 @@ const server = http.createServer(async (req, res) => {
       });
     }
 
-    // 3. Find the listing
+    // 3. Find listing ONLY by productId
     const product = data.products.find(
-      p =>
-        p.productId === productId &&
-        p.sellerId === sellerId
+      p => String(p.productId) === productId
     );
 
     if (!product) {
@@ -67,14 +64,23 @@ const server = http.createServer(async (req, res) => {
       });
     }
 
-    // 4. Only draft listings can be paid for
+    // 4. Listing must be draft
     if (product.status !== 'draft') {
       return json(res, 400, {
         error: 'This listing is not available for payment.'
       });
     }
 
-    // 5. Create payment record
+    // 5. Use sellerId from the actual listing
+    const sellerId = String(product.sellerId || '');
+
+    if (!sellerId) {
+      return json(res, 400, {
+        error: 'Seller information is missing.'
+      });
+    }
+
+    // 6. Create payment record
     const paymentId = 'PAY_' + Date.now();
 
     data.payments.push({
@@ -84,18 +90,14 @@ const server = http.createServer(async (req, res) => {
       utr,
       amount: 4,
       currency: 'INR',
-
-      // This means UTR was submitted,
-      // NOT that the bank payment was independently verified.
       status: 'success',
       verification: 'utr-submitted',
-
       createdAt: Date.now()
     });
 
-    // 6. Publish the listing
+    // 7. Publish listing
     data.products = data.products.map(p => {
-      if (p.productId !== productId) return p;
+      if (String(p.productId) !== productId) return p;
 
       return {
         ...p,
@@ -107,7 +109,7 @@ const server = http.createServer(async (req, res) => {
       };
     });
 
-    // 7. Save everything
+    // 8. Save
     save(data);
 
     return json(res, 200, {
