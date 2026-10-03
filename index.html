@@ -731,18 +731,38 @@ function pageCheckout(app,id){
   +'<p class="meta" style="margin-top:14px;line-height:1.7">🔒 The server checks the 12-digit format and permanently blocks duplicate UTRs. This records the submitted UTR; automatic bank confirmation requires a payment gateway webhook.</p>'
   +'</div></div>';
 }
-function verifyPay(id){
+function verifyPay(id) {
   const utr = $('#utr').value.trim();
   const err = $('#utrerr');
 
-  if(!/^\d{12}$/.test(utr)){
+  if (!/^\d{12}$/.test(utr)) {
     err.style.display = 'block';
     err.textContent = 'Enter the exact 12-digit UTR.';
     return;
   }
 
-  // 12 digit mil gaya → seedha success
+  const products = DB.get('products') || [];
+  const index = products.findIndex(function (item) {
+    return String(item.id) === String(id);
+  });
+
+  if (index === -1) {
+    err.style.display = 'block';
+    err.textContent = 'Listing not found.';
+    return;
+  }
+
+  products[index].status = 'published';
+  products[index].paymentStatus = 'paid';
+  products[index].paid = true;
+  products[index].publishedAt = new Date().toISOString();
+  products[index].paymentId = 'UTR-' + utr;
+
+  DB.set('products', products);
+  DB.set('lastPay', 'UTR-' + utr);
   DB.set('lastPaymentId', 'UTR-' + utr);
+
+  toast('Listing is now online');
   go('#/payment-success');
 }
 
