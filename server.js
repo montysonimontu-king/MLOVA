@@ -28,7 +28,102 @@ const server = http.createServer(async (req, res) => {
   if (url.pathname === '/api/auth/google' && req.method === 'POST') { try { const input = await body(req); if (!process.env.GOOGLE_CLIENT_ID) return json(res,503,{error:'Google Sign-In is not configured yet. Add GOOGLE_CLIENT_ID on the server.'}); if (!input.credential) return json(res,400,{error:'Google credential is missing'}); const g=await googleTokenInfo(input.credential); if(g.aud!==process.env.GOOGLE_CLIENT_ID||(g.iss!=='accounts.google.com'&&g.iss!=='https://accounts.google.com')||g.email_verified!=='true')return json(res,401,{error:'Google account could not be verified'}); const email=String(g.email||'').toLowerCase(); let user=data.users.find(u=>u.googleSub===g.sub||u.email===email); if(user){user={...user,googleSub:g.sub,authProvider:'google',profilePhoto:g.picture||user.profilePhoto||'',name:g.name||user.name};data.users=data.users.map(u=>u.uid===user.uid?user:u)}else{user={uid:'g'+g.sub,googleSub:g.sub,authProvider:'google',name:g.name||email.split('@')[0],email,pass:'',phone:'',profilePhoto:g.picture||'',city:'Jaipur',locality:'',role:'user',createdAt:Date.now()};data.users.push(user)} save(data); return json(res,200,{ok:true,user:{...user,pass:undefined}})}catch(e){return json(res,401,{error:e.message||'Google Sign-In failed'})} }
   if (url.pathname === '/api/auth/forgot' && req.method === 'POST') { try { const input=await body(req), email=String(input.email||'').trim().toLowerCase(); if(!/^\S+@\S+\.\S+$/.test(email)) return json(res,400,{error:'Enter a valid email'}); if(!process.env.RESEND_API_KEY||!process.env.MAIL_FROM||!process.env.PUBLIC_APP_URL) return json(res,503,{error:'Email service is not configured. Add RESEND_API_KEY, MAIL_FROM and PUBLIC_APP_URL.'}); const user=data.users.find(u=>u.email===email); if(user){const token=crypto.randomBytes(32).toString('hex'); data.resetTokens=data.resetTokens||{}; data.resetTokens[hashToken(token)]={uid:user.uid,expiresAt:Date.now()+30*60*1000}; save(data); await sendResetEmail(email,token)} return json(res,200,{ok:true,message:'If an account exists for that email, a reset link has been sent.'})}catch(e){return json(res,502,{error:'Could not send the reset email. Please try again.'})} }
   if (url.pathname === '/api/auth/reset' && req.method === 'POST') { try { const input=await body(req), token=String(input.token||''), password=String(input.password||''); if(token.length<20||password.length<6)return json(res,400,{error:'Invalid reset request'}); const key=hashToken(token), entry=(data.resetTokens||{})[key]; if(!entry||entry.expiresAt<Date.now())return json(res,400,{error:'This reset link is invalid or expired'}); data.users=data.users.map(u=>u.uid===entry.uid?{...u,pass:password}:u); delete data.resetTokens[key]; save(data); return json(res,200,{ok:true})}catch(e){return json(res,400,{error:'Could not reset password'})} }
-  if (url.pathname === '/api/payments/claim' && req.method === 'POST') { try { const input=await body(req),utr=String(input.utr||'').trim(),productId=String(input.productId||''),sellerId=String(input.sellerId||''); if(!/^\d{12}$/.test(utr))return json(res,400,{error:'UTR must be exactly 12 digits'});if(data.payments.some(p=>p.utr===utr))return json(res,409,{error:'This UTR has already been used and cannot be reused'});const product=data.products.find(p=>p.productId===productId&&p.sellerId===sellerId);if(!product||product.status!=='draft')return json(res,400,{error:'This listing is not available for payment'});const paymentId='PAY_'+Date.now();data.payments.push({paymentId,sellerId,productId,utr,amount:4,currency:'INR',status:'success',verification:'utr-submitted',createdAt:Date.now()});data.products=data.products.map(p=>p.productId===productId?{...p,status:'published',paymentStatus:'success',paymentId,utr,updatedAt:Date.now()}:p);save(data);return json(res,200,{ok:true,paymentId,productId})}catch(e){return json(res,400,{error:'Could not submit UTR'})} }
+  if (url.pathname === '/api/payments/claim' && req.method === 'POST') {
+  try {
+    const input = await body(req);
+
+    const utr = String(input.utr || '').trim();
+    const productId = String(input.productId || '').trim();
+    const sellerId = String(input.sellerId || '').trim();
+
+    // 1. UTR must be exactly 12 digits
+    if (!/^\d{12}$/.test(utr)) {
+      return json(res, 400, {
+        error: 'UTR must be exactly 12 digits'
+      });
+    }
+
+    // 2. Same UTR can NEVER be used again
+    const alreadyUsed = data.payments.some(
+      p => String(p.utr || '').trim() === utr
+    );
+
+    if (alreadyUsed) {
+      return json(res, 409, {
+        error: 'This UTR has already been used and cannot be reused.'
+      });
+    }
+
+    // 3. Find the listing
+    const product = data.products.find(
+      p =>
+        p.productId === productId &&
+        p.sellerId === sellerId
+    );
+
+    if (!product) {
+      return json(res, 404, {
+        error: 'Listing not found.'
+      });
+    }
+
+    // 4. Only draft listings can be paid for
+    if (product.status !== 'draft') {
+      return json(res, 400, {
+        error: 'This listing is not available for payment.'
+      });
+    }
+
+    // 5. Create payment record
+    const paymentId = 'PAY_' + Date.now();
+
+    data.payments.push({
+      paymentId,
+      sellerId,
+      productId,
+      utr,
+      amount: 4,
+      currency: 'INR',
+
+      // This means UTR was submitted,
+      // NOT that the bank payment was independently verified.
+      status: 'success',
+      verification: 'utr-submitted',
+
+      createdAt: Date.now()
+    });
+
+    // 6. Publish the listing
+    data.products = data.products.map(p => {
+      if (p.productId !== productId) return p;
+
+      return {
+        ...p,
+        status: 'published',
+        paymentStatus: 'success',
+        paymentId,
+        utr,
+        updatedAt: Date.now()
+      };
+    });
+
+    // 7. Save everything
+    save(data);
+
+    return json(res, 200, {
+      ok: true,
+      paymentId,
+      productId
+    });
+
+  } catch (e) {
+    console.error('Payment claim error:', e);
+
+    return json(res, 400, {
+      error: 'Could not submit UTR'
+    });
+  }
+}
   if (url.pathname === '/api/state' && req.method === 'GET') { const key=url.searchParams.get('key');if(!SHARED_KEYS.has(key))return json(res,400,{error:'Invalid key'});return json(res,200,{value:data[key]??DEFAULTS[key]}); }
   if (url.pathname === '/api/state' && req.method === 'POST') { try { const input=await body(req),key=input.key;if(!SHARED_KEYS.has(key))return json(res,400,{error:'Invalid key'});data[key]=input.value;save(data);return json(res,200,{ok:true,value:data[key]})}catch{return json(res,400,{error:'Invalid JSON'})} }
   if (url.pathname === '/manus-routes.json') return json(res,200,{routes:[{path:'/',title:'Home'},{path:'/browse',title:'Browse Products'},{path:'/categories',title:'Categories'},{path:'/sell',title:'Sell Product'},{path:'/login',title:'Login'},{path:'/signup',title:'Sign Up'},{path:'/forgot',title:'Forgot Password'},{path:'/reset',title:'Reset Password'},{path:'/dashboard',title:'Seller Dashboard'},{path:'/profile',title:'Profile'}]});
