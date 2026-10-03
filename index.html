@@ -239,18 +239,23 @@ function havKm(a,b){if(!a||!b)return 1e9;const R=6371,x=(b[0]-a[0])*Math.PI/180,
 function useLocation(){if(!navigator.geolocation){toast('Geolocation not supported by this browser');return}toast('Detecting your location…');navigator.geolocation.getCurrentPosition(pos=>{DB.set('geo',{lat:pos.coords.latitude,lng:pos.coords.longitude});toast('Location set — use the Distance filter 📍');render()},()=>toast('Location permission denied'))}
 
 const LOCAL_KEYS=new Set(['session','city','geo','lastPay']);
+const REMOTE_KEYS=['users','products','payments','reports','blocked','favs','seeded'];
+const remoteCache={};
+REMOTE_KEYS.forEach(k=>{try{const v=JSON.parse(localStorage.getItem('mlova_'+k));if(v!=null)remoteCache[k]=v}catch(e){}});
 const DB={
   get(k,d){
     if(LOCAL_KEYS.has(k)){try{const v=JSON.parse(localStorage.getItem('mlova_'+k));return v==null?d:v}catch(e){return d}}
-    try{const x=new XMLHttpRequest();x.open('GET','/api/state?key='+encodeURIComponent(k),false);x.send();if(x.status===200){const v=JSON.parse(x.responseText).value;return v==null?d:v}}catch(e){}
+    if(Object.prototype.hasOwnProperty.call(remoteCache,k))return remoteCache[k];
     try{const v=JSON.parse(localStorage.getItem('mlova_'+k));return v==null?d:v}catch(e){return d}
   },
   set(k,v){
     if(LOCAL_KEYS.has(k)){localStorage.setItem('mlova_'+k,JSON.stringify(v));return}
-    try{const x=new XMLHttpRequest();x.open('POST','/api/state',false);x.setRequestHeader('Content-Type','application/json');x.send(JSON.stringify({key:k,value:v}));if(x.status>=200&&x.status<300)return}catch(e){}
-    localStorage.setItem('mlova_'+k,JSON.stringify(v))
+    remoteCache[k]=v;
+    localStorage.setItem('mlova_'+k,JSON.stringify(v));
+    fetch('/api/state',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:k,value:v}),keepalive:true}).catch(()=>{});
   }
 };
+async function hydrateRemoteState(){await Promise.all(REMOTE_KEYS.map(async k=>{try{const r=await fetch('/api/state?key='+encodeURIComponent(k),{cache:'no-store'});if(r.ok){const v=(await r.json()).value;remoteCache[k]=v;localStorage.setItem('mlova_'+k,JSON.stringify(v));}}catch(e){}}))}
 function apiJSON(url, payload){return new Promise((resolve,reject)=>{const x=new XMLHttpRequest();x.open('POST',url,true);x.setRequestHeader('Content-Type','application/json');x.onload=()=>{let d={};try{d=JSON.parse(x.responseText)}catch(e){};x.status>=200&&x.status<300?resolve(d):reject(new Error(d.error||'Request failed'))};x.onerror=()=>reject(new Error('Could not connect to the server'));x.send(JSON.stringify(payload||{}))})}
 
 function ago(t){const s=(Date.now()-t)/1e3;if(s<60)return'just now';if(s<3600)return Math.floor(s/60)+'m ago';if(s<86400)return Math.floor(s/3600)+'h ago';const d=Math.floor(s/86400);return d===1?'yesterday':d+'d ago'}
@@ -274,8 +279,6 @@ function seed(){
   DB.set('favs',{});
   DB.set('seeded',1);
 }
-seed();
-
 /* ---------- AUTH (mock — replace with Firebase Auth) ---------- */
 const me=()=>{const id=DB.get('session',null);return DB.get('users',[]).find(u=>u.uid===id)||null};
 const isAdmin=()=>{const u=me();return u&&u.role==='admin'};
@@ -302,7 +305,7 @@ function userChip(){const u=me();$('#hauth').innerHTML=u
 /* ---------- ROUTER ---------- */
 function nav(){const r=(location.hash.replace('#','')||'/').split('?')[0];$$('.bnav a').forEach(a=>a.classList.toggle('on',a.dataset.r===r||(a.dataset.r==='/'&&r==='/')))}
 window.addEventListener('hashchange',render);
-window.addEventListener('load',()=>{$('#hc').innerHTML=CITIES.map(c=>'<option '+(c===myCity()?'selected':'')+'>'+c+'</option>').join('');render();setTimeout(()=>$('#bootScreen')?.classList.add('hide'),450)});
+window.addEventListener('load',async()=>{$('#hc').innerHTML=CITIES.map(c=>'<option '+(c===myCity()?'selected':'')+'>'+c+'</option>').join('');await hydrateRemoteState();seed();render();setTimeout(()=>$('#bootScreen')?.classList.add('hide'),350)});
 
 const PROTECTED=['/dashboard','/my-listings','/sell','/profile','/favorites'];
 function go(h){location.hash=h}
