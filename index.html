@@ -732,12 +732,10 @@ function pageCheckout(app,id){
   +'</div></div>';
 }
 function verifyPay(id){
-  const p = getProduct(id);
   const utrInput = $('#utr');
   const utr = utrInput ? utrInput.value.trim() : '';
   const err = $('#utrerr');
 
-  // Only 12-digit UTR allowed
   if(!/^\d{12}$/.test(utr)){
     if(err){
       err.style.display = 'block';
@@ -748,42 +746,41 @@ function verifyPay(id){
 
   if(err) err.style.display = 'none';
 
-  openModal(
-    '<h3 style="margin-bottom:8px">Checking UTR…</h3>' +
-    '<p class="meta">Please wait.</p>'
-  );
-
-  const x = new XMLHttpRequest();
-
-  x.open('POST','/api/payments/claim',true);
-  x.setRequestHeader('Content-Type','application/json');
-
-  x.onreadystatechange = function(){
-    if(x.readyState !== 4) return;
-
-    let d = {};
-    try{
-      d = JSON.parse(x.responseText || '{}');
-    }catch(e){}
-
-    if(x.status !== 200 || !d.ok){
-
-      closeModal();
-
-      if(err){
-        err.style.display = 'block';
-        err.textContent =
-          d.error || 'This UTR could not be accepted.';
-      }
-
-      return;
+  // Check for duplicate UTR in localStorage
+  var usedUTRs = [];
+  try { usedUTRs = JSON.parse(localStorage.getItem('mlova_utrs') || '[]'); } catch(e){}
+  if(usedUTRs.indexOf(utr) !== -1){
+    if(err){
+      err.style.display = 'block';
+      err.textContent = 'This UTR has already been used.';
     }
+    return;
+  }
 
-    closeModal();
+  // Save UTR as used
+  usedUTRs.push(utr);
+  localStorage.setItem('mlova_utrs', JSON.stringify(usedUTRs));
 
-    DB.set('lastPaymentId', d.paymentId || null);
-    go('#/payment-success');
-  };
+  // Mark product as published
+  var p = getProduct(id);
+  if(p){
+    p.status = 'published';
+    if(typeof DB !== 'undefined' && DB.set){
+      DB.set('lastPaymentId', 'UTR-' + utr);
+    }
+    if(typeof saveProduct === 'function'){
+      saveProduct(p);
+    } else if(typeof DB !== 'undefined' && DB.set){
+      var all = getAllProducts();
+      var idx = -1;
+      for(var i=0;i<all.length;i++){ if(all[i].id===id){idx=i;break;} }
+      if(idx!==-1){ all[idx]=p; DB.set('products', all); }
+    }
+  }
+
+  go('#/payment-success');
+}
+
 
   x.onerror = function(){
     closeModal();
