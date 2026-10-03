@@ -731,9 +731,10 @@ function pageCheckout(app,id){
   +'<p class="meta" style="margin-top:14px;line-height:1.7">🔒 The server checks the 12-digit format and permanently blocks duplicate UTRs. This records the submitted UTR; automatic bank confirmation requires a payment gateway webhook.</p>'
   +'</div></div>';
 }
-function verifyPay(id) {
-  const utr = $('#utr').value.trim();
+async function verifyPay(id) {
+  const input = $('#utr');
   const err = $('#utrerr');
+  const utr = input.value.trim();
 
   if (!/^\d{12}$/.test(utr)) {
     err.style.display = 'block';
@@ -741,30 +742,60 @@ function verifyPay(id) {
     return;
   }
 
-  const products = DB.get('products') || [];
-  const index = products.findIndex(function (item) {
-    return String(item.id) === String(id);
-  });
+  const product = getProduct(id);
 
-  if (index === -1) {
+  if (!product) {
     err.style.display = 'block';
     err.textContent = 'Listing not found.';
     return;
   }
 
-  products[index].status = 'published';
-  products[index].paymentStatus = 'paid';
-  products[index].paid = true;
-  products[index].publishedAt = new Date().toISOString();
-  products[index].paymentId = 'UTR-' + utr;
+  err.style.display = 'none';
 
-  DB.set('products', products);
-  DB.set('lastPay', 'UTR-' + utr);
-  DB.set('lastPaymentId', 'UTR-' + utr);
+  try {
+    const response = await fetch('/api/payments/claim', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        utr: utr,
+        productId: product.productId,
+        sellerId: product.sellerId
+      })
+    });
 
-  toast('Listing is now online');
-  go('#/payment-success');
+    const result = await response.json();
+
+    if (!response.ok || !result.ok) {
+      throw new Error(result.error || 'Could not publish listing');
+    }
+
+    const updatedProducts = allProducts().map(function (p) {
+      return String(p.productId) === String(id)
+        ? {
+            ...p,
+            status: 'published',
+            paymentStatus: 'success',
+            paymentId: result.paymentId,
+            utr: utr,
+            updatedAt: Date.now()
+          }
+        : p;
+    });
+
+    saveProducts(updatedProducts);
+    DB.set('lastPay', result.paymentId);
+
+    toast('Listing is now online');
+    go('#/payment-success');
+
+  } catch (error) {
+    err.style.display = 'block';
+    err.textContent = error.message;
+  }
 }
+
 
 function pagePayResult(app,ok){
   app.innerHTML='<div class="wrap"><div class="pay-card">'
