@@ -732,15 +732,73 @@ function pageCheckout(app,id){
   +'</div></div>';
 }
 function verifyPay(id){
-  const p=getProduct(id), utr=($('#utr')||{}).value?$('#utr').value.trim():'';
-  const err=$('#utrerr');
-  if(!/^\d{12}$/.test(utr)){if(err){err.style.display='block';err.textContent='Enter the exact 12-digit UTR from your UPI payment.'}return}
-  if(err)err.style.display='none';
-  openModal('<div style="text-align:center;padding:16px 0"><div style="font-size:42px">⏳</div><h3 style="margin:12px 0 6px">Checking UTR…</h3><p class="meta">Saving your payment reference securely</p></div>');
-  const x=new XMLHttpRequest();x.open('POST','/api/payments/claim',true);x.setRequestHeader('Content-Type','application/json');
-  x.onload=()=>{let d={};try{d=JSON.parse(x.responseText)}catch(e){}closeModal();if(x.status!==200||!d.ok){if(err){err.style.display='block';err.textContent=d.error||'UTR could not be confirmed'}toast(d.error||'UTR could not be confirmed');return}DB.set('lastPay',d.paymentId);go('#/payment-success')};
-  x.onerror=()=>{closeModal();toast('Could not connect to payment server')};
-  x.send(JSON.stringify({utr,productId:id,sellerId:p&&p.sellerId}));
+  const p = getProduct(id);
+  const utrInput = $('#utr');
+  const utr = utrInput ? utrInput.value.trim() : '';
+  const err = $('#utrerr');
+
+  // Only 12-digit UTR allowed
+  if(!/^\d{12}$/.test(utr)){
+    if(err){
+      err.style.display = 'block';
+      err.textContent = 'Enter the exact 12-digit UTR.';
+    }
+    return;
+  }
+
+  if(err) err.style.display = 'none';
+
+  openModal(
+    '<h3 style="margin-bottom:8px">Checking UTR…</h3>' +
+    '<p class="meta">Please wait.</p>'
+  );
+
+  const x = new XMLHttpRequest();
+
+  x.open('POST','/api/payments/claim',true);
+  x.setRequestHeader('Content-Type','application/json');
+
+  x.onreadystatechange = function(){
+    if(x.readyState !== 4) return;
+
+    let d = {};
+    try{
+      d = JSON.parse(x.responseText || '{}');
+    }catch(e){}
+
+    if(x.status !== 200 || !d.ok){
+
+      closeModal();
+
+      if(err){
+        err.style.display = 'block';
+        err.textContent =
+          d.error || 'This UTR could not be accepted.';
+      }
+
+      return;
+    }
+
+    closeModal();
+
+    DB.set('lastPaymentId', d.paymentId || null);
+    go('#/payment-success');
+  };
+
+  x.onerror = function(){
+    closeModal();
+
+    if(err){
+      err.style.display = 'block';
+      err.textContent = 'Unable to check UTR. Please try again.';
+    }
+  };
+
+  x.send(JSON.stringify({
+    utr: utr,
+    productId: id,
+    sellerId: p ? p.sellerId : null
+  }));
 }
 function pagePayResult(app,ok){
   app.innerHTML='<div class="wrap"><div class="pay-card">'
