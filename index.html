@@ -831,12 +831,61 @@ function pageAbout(app){app.innerHTML='<div class="wrap"><div class="panel prose
 +'<h3>Buy. Sell. Connect.</h3><p>Meet sellers in your area, inspect items in person, and deal directly. MLOVA connects people — the deal itself is always between buyer and seller, face to face.</p>'
 +'<div style="text-align:center;margin-top:26px"><a class="btn btn-blue" href="#/browse">Explore Products</a> <a class="btn btn-gold" href="#/sell" style="margin-left:8px">Sell for ₹4</a></div></div></div>'}
 
-function pageContact(app){app.innerHTML='<div class="wrap"><div class="form-card"><h2>Contact Us</h2><p class="sub">Questions, feedback or partnership ideas — we read everything</p>'
-+'<label>Your Name</label><input id="c_name" placeholder="Name"/>'
-+'<label>Email</label><input id="c_email" type="email" placeholder="you@example.com"/>'
-+'<label>Message</label><textarea id="c_msg" rows="5" placeholder="How can we help?"></textarea>'
-+'<button class="btn btn-blue btn-block" style="margin-top:18px" onclick="toast(\'Message sent! We will reply within 24 hours.\');go(\'#/\')">Send Message</button>'
-+'<p class="meta" style="margin-top:16px;text-align:center">📧 support@mlova.in · 📍 Jaipur, India</p></div></div>'}
+
+function pageContact(app) {
+  app.innerHTML =
+    '<div class="wrap">' +
+      '<div class="form-card">' +
+        '<h2>Contact Us</h2>' +
+        '<p class="sub">Questions, feedback or partnership ideas — we read everything</p>' +
+
+        '<label>Your Name</label>' +
+        '<input id="c_name" placeholder="Enter your name" required />' +
+
+        '<label>Email</label>' +
+        '<input id="c_email" type="email" placeholder="you@example.com" required />' +
+
+        '<label>Message</label>' +
+        '<textarea id="c_msg" rows="5" placeholder="How can we help?" required></textarea>' +
+
+        '<button class="btn btn-blue btn-block" style="margin-top:18px" onclick="sendContactWhatsApp()">' +
+          'Send Message on WhatsApp' +
+        '</button>' +
+
+        '<p class="meta" style="margin-top:16px;text-align:center">' +
+          '📧 montusoni@mswebsolution.vercel.app · 📍 Indore, Barwaha, India' +
+        '</p>' +
+      '</div>' +
+    '</div>';
+}
+
+function sendContactWhatsApp() {
+  const name = document.getElementById('c_name').value.trim();
+  const email = document.getElementById('c_email').value.trim();
+  const message = document.getElementById('c_msg').value.trim();
+
+  if (!name || !email || !message) {
+    toast('Please fill all fields!');
+    return;
+  }
+
+  const phone = '919644108484';
+
+  const whatsappMessage =
+    'Hello MLOVA Team! 👋\n\n' +
+    '📩 New Contact Message\n\n' +
+    '👤 Name: ' + name + '\n' +
+    '📧 Email: ' + email + '\n\n' +
+    '💬 Message:\n' + message + '\n\n' +
+    'Thank you!';
+
+  const whatsappURL =
+    'https://wa.me/' + phone +
+    '?text=' + encodeURIComponent(whatsappMessage);
+
+  window.open(whatsappURL, '_blank');
+}
+
 
 function pageHelp(app){const F=(q,a)=>'<details class="faq-item"><summary>'+q+'</summary><p>'+a+'</p></details>';
 app.innerHTML='<div class="wrap" style="max-width:760px"><h1 class="page-title">Help &amp; FAQ</h1><p class="page-sub">Everything you need to know about MLOVA</p>'
