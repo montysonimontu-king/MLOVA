@@ -105,6 +105,19 @@ const server = http.createServer(async (req, res) => {
       error: 'Could not confirm listing'
     });
   }
+} if (url.pathname === '/montu.png' && req.method === 'GET') {
+  const imagePath = path.join(ROOT, 'montu.png');
+
+  if (!fs.existsSync(imagePath)) {
+    return json(res, 404, { error: 'montu.png not found' });
+  }
+
+  res.writeHead(200, {
+    'Content-Type': 'image/png',
+    'Cache-Control': 'public, max-age=31536000, immutable'
+  });
+
+  return fs.createReadStream(imagePath).pipe(res);
 }
   if (url.pathname === '/api/state' && req.method === 'GET') { const key=url.searchParams.get('key');if(!SHARED_KEYS.has(key))return json(res,400,{error:'Invalid key'});return json(res,200,{value:data[key]??DEFAULTS[key]}); }
   if (url.pathname === '/api/state' && req.method === 'POST') { try { const input=await body(req),key=input.key;if(!SHARED_KEYS.has(key))return json(res,400,{error:'Invalid key'});data[key]=input.value;save(data);return json(res,200,{ok:true,value:data[key]})}catch{return json(res,400,{error:'Invalid JSON'})} }
