@@ -719,7 +719,7 @@ function pageCheckout(app,id){
   +'<h2 style="font-size:20px">Complete Your Payment</h2><p class="meta" style="margin:6px 0 4px">'+esc(p.title)+'</p>'
   +'<div style="font-size:44px;font-weight:800;color:var(--blue);margin:10px 0">₹4<span style="font-size:18px;color:var(--muted)">.00</span></div>'
   +'<div class="meta" style="margin-bottom:4px">One-time listing fee · publish instantly</div>'
- +'<div class="qrbox"><img src="montu.png" alt="UPI QR — montusoni@fam"/></div>'  +'<p class="meta" style="margin:10px 0">Scan with GPay · PhonePe · Paytm · BHIM<br/>After payment, enter the 12-digit UTR shown in your UPI app.</p>'
+  +'<div class="qrbox"><img src="./montu.png" alt="UPI QR — montusoni@fam"/></div>'  +'<p class="meta" style="margin:10px 0">Scan with GPay · PhonePe · Paytm · BHIM<br/>After payment, enter the 12-digit UTR shown in your UPI app.</p>'
   +'<div class="upi-id"><code>montusoni@fam</code><button class="btn btn-ghost btn-sm" onclick="navigator.clipboard.writeText(\'montusoni@fam\').then(()=>toast(\'UPI ID copied ✓\'))">Copy</button></div>'
   +'<a class="btn btn-blue btn-block" href="'+upiLink()+ '">Pay ₹4 via UPI App</a>'
   +'<label style="text-align:left;margin-top:16px">12-digit UTR / Transaction ID *</label>'
