@@ -732,71 +732,20 @@ function pageCheckout(app,id){
   +'</div></div>';
 }
 function verifyPay(id){
-  const utrInput = $('#utr');
-  const utr = utrInput ? utrInput.value.trim() : '';
+  const utr = $('#utr').value.trim();
   const err = $('#utrerr');
 
   if(!/^\d{12}$/.test(utr)){
-    if(err){
-      err.style.display = 'block';
-      err.textContent = 'Enter the exact 12-digit UTR.';
-    }
+    err.style.display = 'block';
+    err.textContent = 'Enter the exact 12-digit UTR.';
     return;
   }
 
-  if(err) err.style.display = 'none';
-
-  // Check for duplicate UTR in localStorage
-  var usedUTRs = [];
-  try { usedUTRs = JSON.parse(localStorage.getItem('mlova_utrs') || '[]'); } catch(e){}
-  if(usedUTRs.indexOf(utr) !== -1){
-    if(err){
-      err.style.display = 'block';
-      err.textContent = 'This UTR has already been used.';
-    }
-    return;
-  }
-
-  // Save UTR as used
-  usedUTRs.push(utr);
-  localStorage.setItem('mlova_utrs', JSON.stringify(usedUTRs));
-
-  // Mark product as published
-  var p = getProduct(id);
-  if(p){
-    p.status = 'published';
-    if(typeof DB !== 'undefined' && DB.set){
-      DB.set('lastPaymentId', 'UTR-' + utr);
-    }
-    if(typeof saveProduct === 'function'){
-      saveProduct(p);
-    } else if(typeof DB !== 'undefined' && DB.set){
-      var all = getAllProducts();
-      var idx = -1;
-      for(var i=0;i<all.length;i++){ if(all[i].id===id){idx=i;break;} }
-      if(idx!==-1){ all[idx]=p; DB.set('products', all); }
-    }
-  }
-
+  // 12 digit mil gaya → seedha success
+  DB.set('lastPaymentId', 'UTR-' + utr);
   go('#/payment-success');
 }
 
-
-  x.onerror = function(){
-    closeModal();
-
-    if(err){
-      err.style.display = 'block';
-      err.textContent = 'Unable to check UTR. Please try again.';
-    }
-  };
-
-  x.send(JSON.stringify({
-    utr: utr,
-    productId: id,
-    sellerId: p ? p.sellerId : null
-  }));
-}
 function pagePayResult(app,ok){
   app.innerHTML='<div class="wrap"><div class="pay-card">'
   +(ok?'<div class="big-ic">✅</div><h2 style="margin:12px 0 6px">Payment Successful!</h2><p class="meta">Your product is now <b style="color:var(--green)">LIVE</b> on MLOVA</p><p class="meta" style="margin-top:8px">Payment ID: <b style="color:var(--gold)">'+esc(DB.get('lastPay','—'))+'</b></p><a class="btn btn-blue btn-block" style="margin-top:18px" href="#/my-listings">View My Listings</a>'
