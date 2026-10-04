@@ -5,36 +5,7 @@ const galleryItems = [
     label: 'Such Focus',
     span: 'lg:col-span-2',
   },
-  {
-    src: 'https://images.pexels.com/photos/30543146/pexels-photo-30543146.jpeg?auto=compress&cs=tinysrgb&h=650&w=940',
-    alt: 'Fresh bananas',
-    label: 'Very Banana',
-    span: '',
-  },
-  {
-    src: 'https://images.pexels.com/photos/10497109/pexels-photo-10497109.jpeg?auto=compress&cs=tinysrgb&h=650&w=940',
-    alt: 'French Bulldog puppy',
-    label: 'Much Cute',
-    span: '',
-  },
-  {
-    src: 'https://images.pexels.com/photos/18461394/pexels-photo-18461394.jpeg?auto=compress&cs=tinysrgb&h=650&w=940',
-    alt: 'Shiba running on beach',
-    label: 'So Free',
-    span: 'lg:col-span-2',
-  },
-  {
-    src: 'https://images.pexels.com/photos/34222965/pexels-photo-34222965.jpeg?auto=compress&cs=tinysrgb&h=650&w=940',
-    alt: 'Happy Pomeranian',
-    label: 'Wow Smile',
-    span: '',
-  },
-  {
-    src: 'https://images.pexels.com/photos/3888471/pexels-photo-3888471.jpeg?auto=compress&cs=tinysrgb&h=650&w=940',
-    alt: 'Border collie puppy',
-    label: 'Good Boy',
-    span: '',
-  },
+ 
 ];
 
 export default function Gallery() {
